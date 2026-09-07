@@ -310,7 +310,7 @@ def _test_provider_connection(provider_type: str, config: dict) -> dict:
     Returns:
         dict: 测试结果
     """
-    test_prompt = "请只回复：红墨连接测试成功"
+    test_prompt = "请只回复：连接测试成功"
 
     if provider_type == 'google_genai':
         return _test_google_genai(config)
@@ -419,7 +419,7 @@ def _test_image_api(config: dict) -> dict:
     if endpoint_type and ('chat' in endpoint_type or 'completions' in endpoint_type):
         result = _test_openai_chat_completion(
             config,
-            "请只回复：红墨连接测试成功",
+            "请只回复：连接测试成功",
         )
         return _llm_smoke_response_payload(result)
 
@@ -599,7 +599,7 @@ def _check_response(result: LlmSmokeResult) -> dict:
     if result.source in ["reasoning_content", "reasoning_tokens"]:
         return _llm_smoke_response_payload(result)
 
-    if "红墨" in result.text:
+    if "连接测试成功" in result.text:
         return _llm_smoke_response_payload(result)
     else:
         return {
