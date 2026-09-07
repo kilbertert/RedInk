@@ -27,3 +27,15 @@ providers:
     base_url: https://your-api-endpoint.com
     model: dall-e-3
     high_concurrency: false
+
+  # 皮皮虾AI（psydo.top）OpenAI 兼容图片 API
+  # 推荐: api_key 写入项目根 .env,这里留空;不要把 key commit 到仓库
+  psydo_image:
+    type: image_api
+    api_key: ""                       # 留空,改用 PSYDO_API_KEY 环境变量
+    base_url: https://api.psydo.top
+    model: gpt-image-2-firefly
+    high_concurrency: false
+    # endpoint_type: images           # 默认走 /v1/images/generations
+    # default_aspect_ratio: 3:4
+    # image_size: 4K
