@@ -39,7 +39,7 @@ def setup_logging():
 def create_app():
     # 设置日志
     logger = setup_logging()
-    logger.info("🚀 正在启动 红墨 AI图文生成器...")
+    logger.info("🚀 正在启动 AI 图文生成器...")
 
     # 加载 .env(若存在),允许通过环境变量覆盖 YAML 中的 api_key/base_url/model
     project_root = Path(__file__).parent.parent
@@ -93,7 +93,7 @@ def create_app():
         @app.route('/')
         def index():
             return {
-                "message": "红墨 AI图文生成器 API",
+                "message": "AI 图文生成器 API",
                 "version": "0.1.0",
                 "endpoints": {
                     "health": "/api/health",
