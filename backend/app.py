@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 from flask import Flask, send_from_directory
 from flask_cors import CORS
+from dotenv import load_dotenv
 from backend.config import Config
 from backend.routes import register_routes
 
@@ -39,6 +40,15 @@ def create_app():
     # 设置日志
     logger = setup_logging()
     logger.info("🚀 正在启动 红墨 AI图文生成器...")
+
+    # 加载 .env(若存在),允许通过环境变量覆盖 YAML 中的 api_key/base_url/model
+    project_root = Path(__file__).parent.parent
+    env_path = project_root / '.env'
+    if env_path.exists():
+        load_dotenv(env_path, override=False)
+        logger.info(f"🔐 已加载环境变量文件: {env_path}")
+    else:
+        logger.debug("未发现 .env 文件,继续使用 YAML 配置")
 
     # 检查是否存在前端构建产物（Docker 环境）
     frontend_dist = Path(__file__).parent.parent / 'frontend' / 'dist'

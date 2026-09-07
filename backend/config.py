@@ -1,4 +1,5 @@
 import logging
+import os
 import yaml
 from pathlib import Path
 
@@ -12,8 +13,51 @@ class Config:
     CORS_ORIGINS = ['http://localhost:5173', 'http://localhost:3000']
     OUTPUT_DIR = 'output'
 
+    # 环境变量覆盖:provider_key 是 YAML 里的字段(如 "api_key"),
+    # env_name 是环境变量名(如 "PSYDO_API_KEY")。YAML 非空时优先 yaml,
+    # YAML 空/缺时回落 env。env 不解析设置失败,启动期会清空避免泄露。
+    _ENV_OVERRIDES = {
+        'psydo_image': {
+            'api_key': 'PSYDO_API_KEY',
+            'base_url': 'PSYDO_BASE_URL',
+            'model': 'PSYDO_MODEL',
+        },
+    }
+
     _image_providers_config = None
     _text_providers_config = None
+
+    @classmethod
+    def env_or_yaml(cls, provider_name: str, field: str, yaml_value):
+        """对单字段:env 覆盖 yaml。env 缺失返回 yaml 原值。"""
+        env_map = cls._ENV_OVERRIDES.get(provider_name, {})
+        env_name = env_map.get(field)
+        if env_name:
+            env_val = os.environ.get(env_name)
+            if env_val:
+                logger.debug(
+                    "使用环境变量覆盖配置: provider=%s field=%s env=%s",
+                    provider_name, field, env_name,
+                )
+                return env_val
+        return yaml_value
+
+    @classmethod
+    def apply_env_overrides(cls, provider_name: str, provider_config: dict) -> dict:
+        """对一个 provider 字典应用 env 覆盖,返回新字典(不变更原 dict)。"""
+        env_map = cls._ENV_OVERRIDES.get(provider_name, {})
+        if not env_map:
+            return provider_config
+        merged = dict(provider_config)
+        for field, env_name in env_map.items():
+            env_val = os.environ.get(env_name)
+            if env_val:
+                merged[field] = env_val
+                logger.debug(
+                    "环境变量覆盖生效: provider=%s field=%s env=%s",
+                    provider_name, field, env_name,
+                )
+        return merged
 
     @classmethod
     def load_image_providers_config(cls):
@@ -121,6 +165,7 @@ class Config:
             )
 
         provider_config = providers[provider_name].copy()
+        provider_config = cls.apply_env_overrides(provider_name, provider_config)
 
         # 验证必要字段
         if not provider_config.get('api_key'):
@@ -129,7 +174,8 @@ class Config:
                 f"服务商 {provider_name} 未配置 API Key\n"
                 "解决方案：\n"
                 "1. 在系统设置页面编辑该服务商，填写 API Key\n"
-                "2. 或手动在 image_providers.yaml 中添加 api_key 字段"
+                "2. 或手动在 image_providers.yaml 中添加 api_key 字段\n"
+                f"3. 或设置环境变量 {cls._ENV_OVERRIDES.get(provider_name, {}).get('api_key', '')}".strip()
             )
 
         provider_type = provider_config.get('type', provider_name)
