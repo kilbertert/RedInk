@@ -15,6 +15,7 @@ def _isolated_env(monkeypatch):
     """每个用例前后清空相关环境变量,避免进程级污染。"""
     keys = [
         "PSYDO_API_KEY", "PSYDO_BASE_URL", "PSYDO_MODEL",
+        "TEXT_CLAUDE_API_KEY", "TEXT_CLAUDE_BASE_URL", "TEXT_CLAUDE_MODEL",
         "TEXT_GEMINI_API_KEY", "TEXT_OPENAI_API_KEY",
     ]
     for k in keys:
@@ -124,3 +125,60 @@ def test_get_image_provider_config_still_raises_when_neither_yaml_nor_env():
         Config.get_image_provider_config("psydo_image")
     # 错误信息应提示 env 变量名,帮用户自助
     assert "PSYDO_API_KEY" in str(exc.value)
+
+
+# ─── 文本 provider (claude_local) ───
+
+def test_apply_env_overrides_claude_local_replaces_empty_yaml(monkeypatch):
+    monkeypatch.setenv("TEXT_CLAUDE_API_KEY", "sk-from-env")
+    cfg = {"api_key": "", "base_url": "http://yaml", "model": "yaml-model"}
+    merged = Config.apply_env_overrides("claude_local", cfg)
+    assert merged["api_key"] == "sk-from-env"
+    assert merged["base_url"] == "http://yaml"
+
+
+def test_get_text_provider_config_uses_env_when_yaml_empty(monkeypatch):
+    monkeypatch.setenv("TEXT_CLAUDE_API_KEY", "sk-from-env")
+    monkeypatch.setenv("TEXT_CLAUDE_BASE_URL", "http://127.0.0.1:8317/v1")
+    monkeypatch.setenv("TEXT_CLAUDE_MODEL", "minimax-m3")
+    Config._text_providers_config = {
+        "active_provider": "claude_local",
+        "providers": {
+            "claude_local": {
+                "type": "openai_compatible",
+                "api_key": "",
+                "base_url": "http://old",
+                "model": "old-model",
+            },
+        },
+    }
+    cfg = Config.get_text_provider_config("claude_local")
+    assert cfg["api_key"] == "sk-from-env"
+    assert cfg["base_url"] == "http://127.0.0.1:8317/v1"
+    assert cfg["model"] == "minimax-m3"
+
+
+def test_get_active_text_provider_returns_default_when_yaml_missing(monkeypatch, tmp_path):
+    """强行替换 Config 内 yaml 路径不可达,验证回落 google_gemini。"""
+    # 直接 monkey-patch load_text_providers_config 走默认分支:yaml 不存在
+    # 的兜底结构来自 Config.load_text_providers_config 自身;这里改成
+    # 临时把 active_provider 字段移除,验证 .get('active_provider', 'google_gemini')
+    Config._text_providers_config = {"providers": {}}  # 无 active_provider 字段
+    assert Config.get_active_text_provider() == "google_gemini"
+
+
+def test_get_text_provider_config_raises_with_env_hint():
+    Config._text_providers_config = {
+        "active_provider": "claude_local",
+        "providers": {
+            "claude_local": {
+                "type": "openai_compatible",
+                "api_key": "",
+                "base_url": "http://127.0.0.1:8317/v1",
+                "model": "minimax-m3",
+            },
+        },
+    }
+    with pytest.raises(ValueError) as exc:
+        Config.get_text_provider_config("claude_local")
+    assert "TEXT_CLAUDE_API_KEY" in str(exc.value)

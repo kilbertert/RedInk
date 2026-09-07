@@ -22,6 +22,11 @@ class Config:
             'base_url': 'PSYDO_BASE_URL',
             'model': 'PSYDO_MODEL',
         },
+        'claude_local': {
+            'api_key': 'TEXT_CLAUDE_API_KEY',
+            'base_url': 'TEXT_CLAUDE_BASE_URL',
+            'model': 'TEXT_CLAUDE_MODEL',
+        },
     }
 
     _image_providers_config = None
@@ -197,3 +202,68 @@ class Config:
         logger.info("重新加载所有配置...")
         cls._image_providers_config = None
         cls._text_providers_config = None
+
+    @classmethod
+    def get_active_text_provider(cls):
+        config = cls.load_text_providers_config()
+        active = config.get('active_provider', 'google_gemini')
+        logger.debug(f"当前激活的文本服务商: {active}")
+        return active
+
+    @classmethod
+    def get_text_provider_config(cls, provider_name: str = None):
+        """镜像 get_image_provider_config:env 覆盖 + 必要字段校验。"""
+        config = cls.load_text_providers_config()
+
+        if provider_name is None:
+            provider_name = cls.get_active_text_provider()
+
+        logger.info(f"获取文本服务商配置: {provider_name}")
+
+        providers = config.get('providers', {})
+        if not providers:
+            raise ValueError(
+                "未找到任何文本生成服务商配置。\n"
+                "解决方案：\n"
+                "1. 在系统设置页面添加文本生成服务商\n"
+                "2. 或手动编辑 text_providers.yaml 文件\n"
+                "3. 确保文件中有 providers 字段"
+            )
+
+        if provider_name not in providers:
+            available = ', '.join(providers.keys()) if providers else '无'
+            logger.error(f"文本服务商 [{provider_name}] 不存在，可用服务商: {available}")
+            raise ValueError(
+                f"未找到文本生成服务商配置: {provider_name}\n"
+                f"可用的服务商: {available}\n"
+                "解决方案：\n"
+                "1. 在系统设置页面添加该服务商\n"
+                "2. 或修改 active_provider 为已存在的服务商\n"
+                "3. 检查 text_providers.yaml 文件"
+            )
+
+        provider_config = providers[provider_name].copy()
+        provider_config = cls.apply_env_overrides(provider_name, provider_config)
+
+        if not provider_config.get('api_key'):
+            logger.error(f"文本服务商 [{provider_name}] 未配置 API Key")
+            raise ValueError(
+                f"服务商 {provider_name} 未配置 API Key\n"
+                "解决方案：\n"
+                "1. 在系统设置页面编辑该服务商，填写 API Key\n"
+                "2. 或手动在 text_providers.yaml 中添加 api_key 字段\n"
+                f"3. 或设置环境变量 {cls._ENV_OVERRIDES.get(provider_name, {}).get('api_key', '')}".strip()
+            )
+
+        provider_type = provider_config.get('type', provider_name)
+        if provider_type in ['openai', 'openai_compatible', 'google_gemini']:
+            if not provider_config.get('base_url'):
+                logger.error(f"服务商 [{provider_name}] 类型为 {provider_type}，但未配置 base_url")
+                raise ValueError(
+                    f"服务商 {provider_name} 未配置 Base URL\n"
+                    f"服务商类型 {provider_type} 需要配置 base_url\n"
+                    "解决方案：在系统设置页面编辑该服务商，填写 Base URL"
+                )
+
+        logger.info(f"文本服务商配置验证通过: {provider_name} (type={provider_type})")
+        return provider_config

@@ -75,12 +75,16 @@ class OutlineService:
             )
 
         provider_config = providers.get(active_provider, {})
+        # 应用环境变量覆盖(api_key/base_url/model);YAML 与 .env 同名时 env 优先
+        from backend.config import Config
+        provider_config = Config.apply_env_overrides(active_provider, provider_config)
 
         if not provider_config.get('api_key'):
             logger.error(f"文本服务商 [{active_provider}] 未配置 API Key")
             raise ValueError(
                 f"文本服务商 {active_provider} 未配置 API Key\n"
-                "解决方案：在系统设置页面编辑该服务商，填写 API Key"
+                "解决方案：在系统设置页面编辑该服务商，填写 API Key\n"
+                "或在 .env 中设置 TEXT_CLAUDE_API_KEY 等环境变量"
             )
 
         logger.info(f"使用文本服务商: {active_provider} (type={provider_config.get('type')})")
